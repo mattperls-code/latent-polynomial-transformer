@@ -3,38 +3,59 @@ import math
 import json
 
 class Polynomial:
-    # (coeff, power, var)
-    terms: list[(float, int, str)]
+    # (coeff, (power, var))
+    terms: list[(float, list[(int, str)])]
 
-    def __init__(self, terms: list[(float, int, str)]):
+    def __init__(self, terms: list[(float, list[(int, str)])]):
         self.terms = terms
 
+    def get_vars(self):
+        return set([var for _, monomials in self.terms for _, var in monomials])
+
     def evaluate(self, vars: dict[str, float]):
-        return sum(coeff * vars[var] ** power for coeff, power, var in self.terms)
+        return sum(coeff * sum([vars[var] ** power for power, var in monomials]) for coeff, monomials in self.terms)
 
     def to_string(self):
-        return " + ".join([f"{coeff} {var} ^ {power}" for coeff, power, var in self.terms])
+        return " + ".join([f"{coeff} " + " ".join([f"{var} ^ {power}" for power, var in monomials]) for coeff, monomials in self.terms])
     
     def to_latex(self):
-        return " + ".join([f"{coeff} {var} ^ {{{power}}}" for coeff, power, var in self.terms])
+        return " + ".join([f"{coeff} " + " ".join([f"{var} ^ {{{power}}}" for power, var in monomials]) for coeff, monomials in self.terms])
 
-# generate a multivariable polynomial of a given degree such that its range is within some desired range when evaluated in a given input range
-def generate_polynomial(num_vars: int, degree: int, input_range: float, desired_range: float):
+# generate a random multivariable polynomial such that D: (-1, 1) and R: (-1, 1)
+def generate_polynomial(num_vars: int, degree: int):
+    max_domain = 1 - 1e-10
+    max_range = 1 - 1e-10
+
+    # num unique ways to pick degree for each var
+    num_terms = num_vars ** degree
+
+    desired_range_per_term = max_domain / num_terms
+
     terms = []
 
-    num_terms = num_vars * degree
+    for i in range(0, num_terms):
+        monomials = []
 
-    for i in range(1, 1 + num_vars):
-        var = f"x_{i}"
+        monomials_product = 1
 
-        for power in range(1, 1 + degree):
-            # scale the contribution of each term to ensure desired range is respected
-            # coeff * input_range ** power must be at most desired_range / num_terms
+        for j in range(0, num_vars):
+            power = (i % degree) + 1
+            var = f"x_{j + 1}"
+            
+            i -= i % degree
+            i /= degree
 
-            max_coeff = desired_range / (num_terms * input_range ** power)
-            coeff = max_coeff * math.cbrt(random.uniform(-1, 1))
+            monomials.append((power, var))
 
-            terms.append((coeff, power, var))
+            monomials_product *= max_range ** power
+
+        # ensure contribution of this term is within desired_range_per_term
+        max_coeff = desired_range_per_term / monomials_product
+
+        # skew distribution toward -max or +max
+        coeff = max_coeff * math.cbrt(math.cbrt(random.uniform(-1, 1)))
+
+        terms.append((coeff, monomials))
 
     return Polynomial(terms)
 
@@ -44,7 +65,7 @@ def load_polynomial(path: str):
 
 def main():
     with open("./results/polynomial.json", "w") as output_file:
-        json.dump(generate_polynomial(10, 5, 10, 1).terms, output_file, indent=4)
+        json.dump(generate_polynomial(4, 4).terms, output_file, indent=4)
 
     new_polynomial = load_polynomial("./results/polynomial.json")
 

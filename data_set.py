@@ -23,7 +23,7 @@ class DataSet:
         all_data = []
 
         for _ in range(num_training_samples + num_validation_samples):
-            for var in vars: vars[var] = trunc_num(random.uniform(-1, 1), 8)
+            for var in vars: vars[var] = trunc_num(random.uniform(-1, 1), 4 + random.randint(0, 6))
             
             all_data.append((
                 # replace "0." so that only significant chars are used

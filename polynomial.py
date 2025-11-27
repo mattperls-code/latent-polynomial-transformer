@@ -23,11 +23,11 @@ class Polynomial:
 
 # generate a random multivariable polynomial such that D: (-1, 1) and R: (-1, 1)
 def generate_polynomial(num_vars: int, degree: int):
-    max_domain = 1 - 1e-10
-    max_range = 1 - 1e-10
+    max_domain = 1 - 1e-7
+    max_range = 1 - 1e-7
 
     # num unique ways to pick degree for each var
-    num_terms = num_vars ** degree
+    num_terms = degree ** num_vars
 
     desired_range_per_term = max_domain / num_terms
 
@@ -65,7 +65,7 @@ def load_polynomial(path: str):
 
 def main():
     with open("./results/polynomial.json", "w") as output_file:
-        json.dump(generate_polynomial(4, 4).terms, output_file, indent=4)
+        json.dump(generate_polynomial(4, 3).terms, output_file, indent=4)
 
     new_polynomial = load_polynomial("./results/polynomial.json")
 

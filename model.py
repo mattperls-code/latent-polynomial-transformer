@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
 import math
 import matplotlib.pyplot as plt
 
@@ -8,17 +9,16 @@ from data_set import DataSet, one_hot_encoding_table
 class LatentPolynomialTransformer(nn.Module):
     def __init__(self, data_set: DataSet, d_model: int, nhead: int, num_layers: int, dim_feedforward: int, dim_head, lr: float):
         super().__init__()
-        
-        self.data_set = data_set
 
         self.pad_token = len(one_hot_encoding_table)
 
         vocab_size = len(one_hot_encoding_table) + 1
         max_input_seq_len = max(len(input_seq) for input_seq, _ in (data_set.training_data + data_set.validation_data))
 
-        device = "mps" if torch.backends.mps.is_available() else "cpu"
+        device = "mps" if torch.backends.cuda.a else "cpu"
 
-        self.training_tensors = []
+        training_inputs = []
+        training_expected_outputs = []
         for id_seq, expected_output in data_set.training_data:
             id_seq_tensor = torch.tensor(id_seq, dtype=torch.long, device=device)
 
@@ -27,9 +27,13 @@ class LatentPolynomialTransformer(nn.Module):
 
             expected_output_tensor = torch.tensor([ expected_output ], dtype=torch.float32, device=device)
 
-            self.training_tensors.append((padded_id_seq_tensor, expected_output_tensor))
+            training_inputs.append(padded_id_seq_tensor)
+            training_expected_outputs.append(expected_output_tensor)
 
-        self.validation_tensors = []
+        self.training_data = TensorDataset(torch.stack(training_inputs), torch.stack(training_expected_outputs))
+
+        validation_inputs = []
+        validation_expected_outputs = []
         for id_seq, expected_output in data_set.validation_data:
             id_seq_tensor = torch.tensor(id_seq, dtype=torch.long, device=device)
 
@@ -38,7 +42,10 @@ class LatentPolynomialTransformer(nn.Module):
 
             expected_output_tensor = torch.tensor([ expected_output ], dtype=torch.float32, device=device)
 
-            self.validation_tensors.append((padded_id_seq_tensor, expected_output_tensor))
+            validation_inputs.append(padded_id_seq_tensor)
+            validation_expected_outputs.append(expected_output_tensor)
+
+        self.validation_data = TensorDataset(torch.stack(validation_inputs), torch.stack(validation_expected_outputs))
 
         self.token_emb = nn.Embedding(vocab_size, d_model)
         self.pos_emb = nn.Embedding(max_input_seq_len + 1, d_model)
@@ -58,8 +65,6 @@ class LatentPolynomialTransformer(nn.Module):
             nn.ReLU(),
             nn.Linear(dim_head, dim_head),
             nn.ReLU(),
-            nn.Linear(dim_head, dim_head),
-            nn.ReLU(),
             nn.Linear(dim_head, 1)
         )
 
@@ -68,17 +73,17 @@ class LatentPolynomialTransformer(nn.Module):
 
         self.to(device)
 
-    def forward(self, input_ids: torch.tensor):
-        batch_size, seq_len = input_ids.shape
+    def forward(self, inputs: torch.tensor):
+        batch_size, seq_len = inputs.shape
 
-        token_embeddings = self.token_emb(input_ids)
+        token_embeddings = self.token_emb(inputs)
 
-        positions = torch.arange(seq_len, device=input_ids.device).unsqueeze(0)
+        positions = torch.arange(seq_len, device=inputs.device).unsqueeze(0)
         positional_embeddings = self.pos_emb(positions)
 
         embeddings = token_embeddings + positional_embeddings
 
-        mask = input_ids == self.pad_token
+        mask = inputs == self.pad_token
 
         embeddings = self.encoder(embeddings, src_key_padding_mask=mask)
 
@@ -86,60 +91,45 @@ class LatentPolynomialTransformer(nn.Module):
 
         return self.head(pooled)
     
-    def train(self, training_tensors: list[(torch.tensor, torch.tensor)]):
-        input_ids = []
-        expected_outputs = []
-
-        for id_seq, expected_output in training_tensors:
-            input_ids.append(id_seq)
-            expected_outputs.append(expected_output)
-
-        input_ids = torch.stack(input_ids)
-        expected_outputs = torch.stack(expected_outputs)
-
+    def train(self, inputs: torch.tensor, expected_outputs: torch.tensor):
         self.optimizer.zero_grad()
 
-        loss = self.loss_fn(self.forward(input_ids), expected_outputs)
+        loss = self.loss_fn(self.forward(inputs), expected_outputs)
 
         loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
 
         self.optimizer.step()
 
         return loss
     
-    def loss(self, validation_tensors: list[(torch.tensor, torch.tensor)]):
-        input_ids = []
-        expected_outputs = []
-
-        for id_seq, expected_output in validation_tensors:
-            input_ids.append(id_seq)
-            expected_outputs.append(expected_output)
-
-        input_ids = torch.stack(input_ids)
-        expected_outputs = torch.stack(expected_outputs)
-
-        return self.loss_fn(self.forward(input_ids), expected_outputs)
+    def loss(self, inputs: torch.tensor, expected_outputs: torch.tensor):
+        loss = self.loss_fn(self.forward(inputs), expected_outputs)
+        
+        return loss
     
 def main():
-    model = LatentPolynomialTransformer(DataSet(1200, 300), 64, 2, 4, 64, 64, 3e-3)
+    model = LatentPolynomialTransformer(DataSet(3600, 360), 128, 2, 4, 128, 128, 2e-5)
 
     epoch_samples = []
     training_loss_samples = []
     validation_loss_samples = []
 
-    sample_input_ids = []
-    sample_expectations = []
+    sample_inputs, sample_expected_outputs = model.validation_data.tensors
+    sample_inputs = sample_inputs[:7]
+    sample_expected_outputs = sample_expected_outputs[:7]
 
-    for input_ids, expected_output in model.validation_tensors[0:7]:
-        sample_input_ids.append(input_ids)
-        sample_expectations.append(expected_output)
-    
-    sample_input_ids = torch.stack(sample_input_ids)
-    sample_expectations = torch.stack(sample_expectations)
+    train_loader = DataLoader(model.training_data, batch_size=128, shuffle=True)
 
     for i in range(0, 2000):
-        training_loss = model.train(model.training_tensors)
-        validation_loss = model.loss(model.validation_tensors)
+        for inputs, expected_outputs in train_loader: model.train(inputs, expected_outputs)
+
+        training_inputs, training_expected_outputs = model.training_data.tensors
+        training_loss = model.loss(training_inputs, training_expected_outputs)
+
+        validation_inputs, validation_expected_outputs = model.validation_data.tensors
+        validation_loss = model.loss(validation_inputs, validation_expected_outputs)
 
         epoch_samples.append(i)
         training_loss_samples.append(math.log10(training_loss.detach().cpu().numpy()))
@@ -149,8 +139,8 @@ def main():
             print(f"After Batch {i}:")
             print(f"\tTraining Loss: {training_loss}")
             print(f"\tValidation Loss: {validation_loss}")
-            print(f"\tExpected: {sample_expectations.squeeze(1)}")
-            print(f"\tObserved: {model.forward(sample_input_ids).squeeze(1)}\n")
+            print(f"\tExpected: {sample_expected_outputs.squeeze(1)}")
+            print(f"\tObserved: {model.forward(sample_inputs).squeeze(1)}\n")
 
     plt.plot(epoch_samples, training_loss_samples, label="Training Loss")
     plt.plot(epoch_samples, validation_loss_samples, label="Validation Loss")

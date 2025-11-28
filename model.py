@@ -7,6 +7,13 @@ import matplotlib.pyplot as plt
 from data_set import DataSet, one_hot_encoding_table
 
 class LatentPolynomialTransformer(nn.Module):
+    # data_set automatically generates training and validation data given the content of "results/polynomial.json"
+    # d_model is the embedding dimension of the transformer
+    # nhead is the number of attention heads per layer in the transformer
+    # num_layers is how many attention layers are in the transformer
+    # dim_feedforward is the hidden layer width of the post attention feedforward network
+    # dim_head is the width of the final prediction network
+    # lr is the learning rate
     def __init__(self, data_set: DataSet, d_model: int, nhead: int, num_layers: int, dim_feedforward: int, dim_head, lr: float):
         super().__init__()
 
@@ -15,7 +22,8 @@ class LatentPolynomialTransformer(nn.Module):
         vocab_size = len(one_hot_encoding_table) + 1
         max_input_seq_len = max(len(input_seq) for input_seq, _ in (data_set.training_data + data_set.validation_data))
 
-        device = "mps" if torch.backends.cuda.a else "cpu"
+        # switch this to query for cuda if running on unity
+        device = "mps" if torch.backends.mps.is_available() else "cpu"
 
         training_inputs = []
         training_expected_outputs = []
@@ -116,6 +124,7 @@ def main():
     training_loss_samples = []
     validation_loss_samples = []
 
+    # view samples during training for empirical validation
     sample_inputs, sample_expected_outputs = model.validation_data.tensors
     sample_inputs = sample_inputs[:7]
     sample_expected_outputs = sample_expected_outputs[:7]

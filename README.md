@@ -2,7 +2,7 @@
 
 Training a small transformer to learn latent multivariable polynomials.
 
-![test](results/graph.png)
+![test](results/prototype-run/graph.png)
 
 ## How It Works
 

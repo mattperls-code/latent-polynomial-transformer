@@ -1,0 +1,11 @@
+{
+    "training_count": 8000,
+    "validation_count": 400,
+    "embed_dim": 128,
+    "transformer_heads": 2,
+    "transformer_ff_layers": 4,
+    "transformer_ff_dim": 128,
+    "head_ff_dim": 128,
+    "lr": 0.001,
+    "batch_size": 128
+}

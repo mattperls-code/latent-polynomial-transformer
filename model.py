@@ -120,7 +120,7 @@ class LatentPolynomialTransformer(nn.Module):
         return loss
 
 def run_with_params(run_id, run_params):
-    path = f"./results/experiment1/run-{run_id}/params.json"
+    path = f"./results/experiment2/run-{run_id}/params.json"
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -147,7 +147,7 @@ def run_with_params(run_id, run_params):
 
     train_loader = DataLoader(model.training_data, batch_size=run_params["batch_size"], shuffle=True)
 
-    for i in range(0, 5000):
+    for i in range(0, 10000):
         for inputs, expected_outputs in train_loader: model.train(inputs, expected_outputs)
 
         training_inputs, training_expected_outputs = model.training_data.tensors
@@ -167,7 +167,7 @@ def run_with_params(run_id, run_params):
             print(f"\tExpected: {sample_expected_outputs.squeeze(1)}")
             print(f"\tObserved: {model.forward(sample_inputs).squeeze(1)}\n")
 
-        if i != 0 and i % 500 == 0:
+        if i != 0 and i % 2000 == 0:
             plt.clf()
 
             plt.plot(epoch_samples, training_loss_samples, label="Training Loss")
@@ -178,7 +178,7 @@ def run_with_params(run_id, run_params):
             plt.title("Training vs Validation Loss")
             plt.legend()
 
-            plt.savefig(f"./results/experiment1/run-{run_id}/graph{i}.png")
+            plt.savefig(f"./results/experiment2/run-{run_id}/graph{i}.png")
 
     plt.clf()
 
@@ -190,17 +190,17 @@ def run_with_params(run_id, run_params):
     plt.title("Training vs Validation Loss")
     plt.legend()
 
-    plt.savefig(f"./results/experiment1/run-{run_id}/final-graph.png")
+    plt.savefig(f"./results/experiment2/run-{run_id}/final-graph.png")
     
 def main():
-    learning_rates = [ 1e-6, 5e-6, 1e-5, 2e-4, 5e-4, 1e-3, 2e-3 ]
+    learning_rates = [1e-5, 3e-5, 5e-5, 7e-5, 9e-5, 11e-5, 13e-5, 15e-5]
 
     for run_id, lr in enumerate(learning_rates):
         print(f"Starting training {run_id} with learning rate {lr}")
 
         run_params = {
             "training_count": 8000,
-            "validation_count": 400,
+            "validation_count": 800,
             "embed_dim": 128,
             "transformer_heads": 2,
             "transformer_ff_layers": 4,

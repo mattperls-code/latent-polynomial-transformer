@@ -24,8 +24,9 @@ class LatentPolynomialTransformer(nn.Module):
         vocab_size = len(one_hot_encoding_table) + 1
         max_input_seq_len = max(len(input_seq) for input_seq, _ in (data_set.training_data + data_set.validation_data))
 
-        # switch this to query for cuda if running on unity
-        device = "mps" if torch.backends.mps.is_available() else "cpu"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        print(f"Running model on {device}")
 
         training_inputs = []
         training_expected_outputs = []
@@ -193,7 +194,10 @@ def run_with_params(run_id, run_params):
     plt.savefig(f"./results/experiment2/run-{run_id}/final-graph.png")
     
 def main():
-    learning_rates = [1e-5, 3e-5, 5e-5, 7e-5, 9e-5, 11e-5, 13e-5, 15e-5]
+    learning_rates = [
+        1e-5, 3e-5, 5e-5, 7e-5,
+        9e-5, 11e-5, 13e-5, 15e-5
+    ]
 
     for run_id, lr in enumerate(learning_rates):
         print(f"Starting training {run_id} with learning rate {lr}")

@@ -8,6 +8,8 @@ import json
 
 from data_set import DataSet, one_hot_encoding_table
 
+torch.cuda.empty_cache()
+
 class LatentPolynomialTransformer(nn.Module):
     # data_set automatically generates training and validation data given the content of "results/polynomial.json"
     # d_model is the embedding dimension of the transformer
@@ -72,10 +74,6 @@ class LatentPolynomialTransformer(nn.Module):
         self.head = nn.Sequential(
             nn.Linear(d_model, dim_head),
             nn.ReLU(),
-            nn.Linear(dim_head, dim_head),
-            nn.ReLU(),
-            nn.Linear(dim_head, dim_head),
-            nn.ReLU(),
             nn.Linear(dim_head, 1)
         )
 
@@ -120,8 +118,8 @@ class LatentPolynomialTransformer(nn.Module):
         
         return loss
 
-def run_with_params(run_id, run_params):
-    path = f"./results/experiment2/run-{run_id}/params.json"
+def run_with_params(run_params):
+    path = f"./results/experiment3/params.json"
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
@@ -148,7 +146,7 @@ def run_with_params(run_id, run_params):
 
     train_loader = DataLoader(model.training_data, batch_size=run_params["batch_size"], shuffle=True)
 
-    for i in range(0, 10000):
+    for i in range(0, 50000):
         for inputs, expected_outputs in train_loader: model.train(inputs, expected_outputs)
 
         training_inputs, training_expected_outputs = model.training_data.tensors
@@ -168,7 +166,7 @@ def run_with_params(run_id, run_params):
             print(f"\tExpected: {sample_expected_outputs.squeeze(1)}")
             print(f"\tObserved: {model.forward(sample_inputs).squeeze(1)}\n")
 
-        if i != 0 and i % 2000 == 0:
+        if i != 0 and i % 5000 == 0:
             plt.clf()
 
             plt.plot(epoch_samples, training_loss_samples, label="Training Loss")
@@ -179,7 +177,7 @@ def run_with_params(run_id, run_params):
             plt.title("Training vs Validation Loss")
             plt.legend()
 
-            plt.savefig(f"./results/experiment2/run-{run_id}/graph{i}.png")
+            plt.savefig(f"./results/experiment3/graph{i}.png")
 
     plt.clf()
 
@@ -191,29 +189,21 @@ def run_with_params(run_id, run_params):
     plt.title("Training vs Validation Loss")
     plt.legend()
 
-    plt.savefig(f"./results/experiment2/run-{run_id}/final-graph.png")
+    plt.savefig(f"./results/experiment3/final-graph.png")
     
 def main():
-    learning_rates = [
-        1e-5, 3e-5, 5e-5, 7e-5,
-        9e-5, 11e-5, 13e-5, 15e-5
-    ]
-
-    for run_id, lr in enumerate(learning_rates):
-        print(f"Starting training {run_id} with learning rate {lr}")
-
-        run_params = {
-            "training_count": 8000,
-            "validation_count": 800,
-            "embed_dim": 128,
-            "transformer_heads": 2,
-            "transformer_ff_layers": 4,
-            "transformer_ff_dim": 128,
-            "head_ff_dim": 128,
-            "lr": lr,
-            "batch_size": 128
-        }
-        
-        run_with_params(run_id, run_params)
+    run_params = {
+        "training_count": 8000,
+        "validation_count": 800,
+        "embed_dim": 256,
+        "transformer_heads": 1,
+        "transformer_ff_layers": 2,
+        "transformer_ff_dim": 256,
+        "head_ff_dim": 256,
+        "lr": 0.00009,
+        "batch_size": 16
+    }
+    
+    run_with_params(run_params)
 
 if __name__ == "__main__": main()
